@@ -2,67 +2,82 @@ package main
 
 import (
 	"fmt"
-
-	"time"
 )
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Observation
+
+// As we increase the number of hash functions, FPR increases
+// Optimal value of number of hash functions is given by the formula -
+// k = (m/n) * ln2
+
+// 𝑛 = Number of inserted elements
+
+// 𝑚 = Number of bits in the Bloom filter
+
+// 𝑘 = Number of hash functions
 
 func main() {
 
 	fmt.Println("\t\tImplementing Bloom filter in Go")
 
-	bloomFilterSize := []int{16, 32, 64, 128, 256, 512, 1024, 2048}
+	// Initialize the global hash functions
+	// Init()
 
-	datasetSize := []int{40, 60, 80, 100, 120, 160, 200, 300, 400, 500, 600, 900, 1000}
+	datasetSizes := []int{10, 20, 30, 40, 50, 60, 70}
+	trainTestSplit := 0.4
+	bloomFilterSize := 1024
 
-	trainTestSplit := 0.8
+	// Loop over different numbers of hash functions (from 1 to 10)
+	for numHashes := 1; numHashes <= 30; numHashes++ {
 
-	for _, size := range bloomFilterSize {
+		var xlist []int
+		var ylist []float64
 
-		xlist := []int(make([]int, 0))
-		ylist := []float64(make([]float64, 0))
+		for _, pct := range datasetSizes {
 
-		for _, dtsize := range datasetSize {
+			currentDatasetSize := (bloomFilterSize * pct) / 100
+			xlist = append(xlist, currentDatasetSize)
 
-			dtsize = (size * dtsize) / 100
+			fmt.Println("Bloom filter size:", bloomFilterSize, "Dataset size:", currentDatasetSize)
 
-			xlist = append(xlist, dtsize)
+			bloom := NewBloomFilterMultiHash(uint(bloomFilterSize))
 
-			fmt.Println("Bloom filter size: ", size, "Dataset size: ", dtsize)
-
-			seed := uint32(time.Now().UnixNano())
-
-			bloom := NewBloomFilter(uint(size), seed)
-
-			keys := []string(make([]string, 0))
-
-			for i := 0; i < max(1, int(float64(dtsize)*(trainTestSplit))); i++ {
-				keys = append(keys, GetRandomString(100, 70, 20))
+			// Generate training keys that will be added to the filter
+			numTrainKeys := max(1, int(float64(currentDatasetSize)*trainTestSplit))
+			var trainingKeys []string
+			for range numTrainKeys {
+				trainingKeys = append(trainingKeys, GetRandomString(100, 70, 20))
 			}
 
-			for _, key := range keys {
-				Add(key, bloom)
+			// Insert training keys using the current number of hash functions
+			for _, key := range trainingKeys {
+				AddMultiHash(key, bloom, numHashes)
 			}
 
 			truePositives := 0
-
-			for _, key := range keys {
-				if Exists(key, bloom) {
+			for _, key := range trainingKeys {
+				if ExistsMultiHash(key, bloom, numHashes) {
 					truePositives++
 				}
 			}
 
-			absentKeys := make([]string, 0, dtsize)
-
-			// Generate test keys not added to the Bloom filter
-			for i := 0; i < max(1, int(float64(dtsize)*(1.0-trainTestSplit))); i++ {
+			numTestKeys := max(1, int(float64(currentDatasetSize)*(1.0-trainTestSplit)))
+			var absentKeys []string
+			for range numTestKeys {
 				absentKeys = append(absentKeys, GetRandomString(100, 70, 20))
 			}
 
 			falsePositives := 0
 			trueNegatives := 0
-
 			for _, key := range absentKeys {
-				if Exists(key, bloom) {
+				if ExistsMultiHash(key, bloom, numHashes) {
 					falsePositives++
 				} else {
 					trueNegatives++
@@ -77,21 +92,15 @@ func main() {
 				fpr = 0.0
 			}
 
-			fmt.Println("False positives: ", falsePositives, "True negatives: ", trueNegatives)
-
-			fmt.Printf("False Positive Rate: %.6f\n", fpr)
-
-			// ylist = append(ylist, falsePositives)
-
-			ylist = append(ylist, float64(fpr))
+			fmt.Printf("Hash Functions: %d, FPR: %.6f\n", numHashes, fpr)
+			ylist = append(ylist, fpr)
 		}
 
-		plotTitle := "Bloom filter of size " + fmt.Sprint(size)
+		plotTitle := fmt.Sprintf("Bloom Filter FPR with %d Hash Functions", numHashes)
 		xlabel := "Dataset size"
 		ylabel := "False Positive Rate (FPR)"
-		imageLocation := "BloomFilterSize" + fmt.Sprint(size)
+		imageLocation := fmt.Sprintf("HashFunctionsCnt_%d", numHashes)
 
-		GetPlot(plotTitle, xlabel, ylabel, xlist, ylist, "FPR Plots", imageLocation)
+		GetPlot(plotTitle, xlabel, ylabel, xlist, ylist, "Plots for MultipleHashFunctions/FPR Plots", imageLocation)
 	}
-
 }
