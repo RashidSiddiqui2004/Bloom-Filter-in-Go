@@ -4,63 +4,70 @@ import (
 	"fmt"
 
 	"time"
-
-	"github.com/spaolacci/murmur3"
 )
 
-// hashMurmur3 hashes a string using MurmurHash3 with a given seed.
-
-func hashMurmur3(data string, seed uint32) uint32 {
-	h := murmur3.New32WithSeed(seed)
-	h.Write([]byte(data))
-	return h.Sum32()
-}
-
-type BloomFilter struct {
-	bitArray []bool
-	size     uint
-	seed     uint32
-}
-
-func NewBloomFilter(size uint, seed uint32) *BloomFilter {
-	return &BloomFilter{
-		bitArray: make([]bool, size),
-		size:     size,
-		seed:     seed,
-	}
-}
-
-func Add(key string, bloom *BloomFilter) {
-	hash := hashMurmur3(key, bloom.seed)
-	index := hash % uint32(bloom.size)
-	fmt.Println(key, " added at index ", index)
-	bloom.bitArray[index] = true
-}
-
-func Exists(key string, bloom *BloomFilter) bool {
-	hash := hashMurmur3(key, bloom.seed)
-	index := hash % uint32(bloom.size)
-	return bloom.bitArray[index]
-}
-
 func main() {
-	fmt.Println("Implementing Bloom filter!")
-	seed := uint32(time.Now().UnixNano())
 
-	bloom := NewBloomFilter(16, seed)
+	fmt.Println("\t\tImplementing Bloom filter in Go")
 
-	keys := []string{"a", "b", "c"}
+	bloomFilterSize := []int{16, 32, 64, 128, 256, 512, 1024, 2048, 4096}
 
-	for _, key := range keys {
-		Add(key, bloom)
+	datasetSize := []int{10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+
+	trainTestSplit := 0.8
+
+	for _, size := range bloomFilterSize {
+
+		for _, dtsize := range datasetSize {
+
+			dtsize = size * dtsize / 100
+
+			fmt.Println("Bloom filter size: ", size, "Dataset size: ", dtsize)
+
+			seed := uint32(time.Now().UnixNano())
+
+			bloom := NewBloomFilter(uint(size), seed)
+
+			keys := []string(make([]string, 0))
+
+			for i := 0; i < (int)(float64(dtsize)*trainTestSplit); i++ {
+				keys = append(keys, GetRandomString(100, 70, 20))
+			}
+
+			for _, key := range keys {
+				Add(key, bloom)
+			}
+
+			truePositives := 0
+
+			for _, key := range keys {
+				if Exists(key, bloom) {
+					truePositives++
+				}
+			}
+
+			println("True positives: ", truePositives)
+
+			// fmt.Println("Updated bloom filter :")
+			// fmt.Println(bloom.bitArray)
+
+			absent_keys := []string(make([]string, 0))
+
+			for i := 0; i < (int)(float64(dtsize)*(1.0-trainTestSplit)); i++ {
+				absent_keys = append(absent_keys, GetRandomString(100, 70, 20))
+			}
+
+			falsePositives := 0
+
+			for _, key := range absent_keys {
+				if Exists(key, bloom) {
+					falsePositives++
+				}
+			}
+
+			println("False positives: ", falsePositives)
+		}
+
 	}
-
-	for _, key := range keys {
-		fmt.Println(Exists(key, bloom))
-	}
-
-	fmt.Println("Updated bloom filter :")
-
-	fmt.Println(bloom.bitArray)
 
 }
