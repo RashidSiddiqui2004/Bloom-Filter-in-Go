@@ -13,28 +13,31 @@ func hashMurmur3(data string, seed uint32) uint32 {
 }
 
 type BloomFilter struct {
-	bitArray []bool
+	bitArray []uint8
 	size     uint
 	seed     uint32
 }
 
 func NewBloomFilter(size uint, seed uint32) *BloomFilter {
 	return &BloomFilter{
-		bitArray: make([]bool, size),
+		bitArray: make([]uint8, (size+7)/8),
 		size:     size,
 		seed:     seed,
 	}
 }
 
 func Add(key string, bloom *BloomFilter) {
-	hash := hashMurmur3(key, bloom.seed)
-	index := hash % uint32(bloom.size)
-	// fmt.Println(key, " added at index ", index)
-	bloom.bitArray[index] = true
+	hash := hashMurmur3(key, bloom.seed) // Calculate the hash of the key
+	index := hash % uint32(bloom.size)   // Modulo operation to get the index within the Bloom filter size
+	ind1 := index / 8                    // Calculate the byte index in the bit array
+	ind2 := index % 8                    // Calculate the bit index within the byte
+	bloom.bitArray[ind1] |= (1 << ind2)  // Set the bit at the calculated index to 1
 }
 
 func Exists(key string, bloom *BloomFilter) bool {
 	hash := hashMurmur3(key, bloom.seed)
 	index := hash % uint32(bloom.size)
-	return bloom.bitArray[index]
+	ind1 := index / 8
+	ind2 := index % 8
+	return (bloom.bitArray[ind1] & (1 << ind2)) != 0
 }
